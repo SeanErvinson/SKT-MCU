@@ -41,25 +41,29 @@ BLEService latSer = BLEService("DD02");
 BLEFloatCharacteristic latChar = BLEFloatCharacteristic("DD03", BLERead | BLENotify);
 BLEDescriptor latDesc = BLEDescriptor("2901", "Lat");
 
-const int HIGH_BATTERY = 840;
-const int MEDIUM_BATTERY = 760;
-const int LOW_BATTERY = 650;
-const int SOUND_BIT = 8;
+const unsigned int HIGH_BATTERY = 840;
+const unsigned int MEDIUM_BATTERY = 760;
+const unsigned int LOW_BATTERY = 650;
+const unsigned int speakerInterval = 500;
+const unsigned int pairingInterval = 300;
+const unsigned int batIndInterval = 300;
+const unsigned int batCheckInterval = 3000;
 
 unsigned int buttonFunction = 0;
-unsigned int speakerInterval = 500;
-unsigned int pairingInterval = 300;
 
+unsigned long currentMillis;
 unsigned long fmpMillis = 0;
 unsigned long batIndMillis = 0;
 unsigned long speakerMillis = 0;
 unsigned long pairingMillis = 0;
+unsigned long batCheckMillis = 0;
 
 float batteryVoltage = 0;
 bool isAlarming = false;
 unsigned int loudness = 255;
 boolean outputTone = true;
 boolean pairingState = true;
+boolean isCheckBattery = true;
 
 
 void setup() {  
@@ -105,6 +109,7 @@ void setup() {
 }
 
 void loop() {
+  currentMillis = millis();
   blePeripheral.poll();
   button1.Update();
   if (button1.clicks != 0) buttonFunction = button1.clicks;
@@ -116,7 +121,7 @@ void loop() {
       isAlarming = false;
       aChar.setValue(0);
     }
-    else checkBattery();
+    else isCheckBattery = true;
   }
   
 //  if(buttonFunction == 3) setfmpCharValue();
@@ -130,6 +135,7 @@ void loop() {
 // Continuous Service
   setGPSCharValue();
 //  readBatteryVoltage();
+  checkBattery();
   playSound();
 //  }
 
@@ -152,7 +158,6 @@ void readBatteryVoltage(){
 }
 
 void setfmpCharValue(){
-  unsigned long currentMillis = millis();
   fmpChar.setValue(1);
   changeColor(115, 255, 0);
   if(currentMillis - fmpMillis >= 50){fmpMillis = currentMillis;}
@@ -180,7 +185,6 @@ void activateSound(int sound){
 
 
 void playSound() {
-  unsigned long currentMillis = millis();
   if(isAlarming){
     if (outputTone) {
       if (currentMillis - speakerMillis >= speakerInterval) {
@@ -201,7 +205,6 @@ void playSound() {
 }
 
 void pairingMode() {
-  unsigned long currentMillis = millis();
   if (pairingState) {
       if (currentMillis - pairingMillis >= pairingInterval) {
         pairingMillis = currentMillis;
@@ -218,17 +221,23 @@ void pairingMode() {
 }
 
 void checkBattery() {
-  unsigned long currentMillis = millis();
-  if (batteryVoltage <= HIGH_BATTERY && batteryVoltage > MEDIUM_BATTERY) {
-    changeColor(0, 255, 0); //Green
-  } else if (batteryVoltage < MEDIUM_BATTERY && batteryVoltage > LOW_BATTERY) {
-    changeColor(254, 203, 0); //Yellow
-  } else if (batteryVoltage < LOW_BATTERY) {
-    changeColor(255, 0, 0); //Red
-  }
-  if (currentMillis - batIndMillis >= 2000) {
+  if (isCheckBattery) {
+    if (currentMillis - batIndMillis >= batIndInterval) {
+      if (batteryVoltage <= HIGH_BATTERY && batteryVoltage > MEDIUM_BATTERY) {
+        changeColor(0, 255, 0); //Green
+      } else if (batteryVoltage < MEDIUM_BATTERY && batteryVoltage > LOW_BATTERY) {
+        changeColor(254, 203, 0); //Yellow
+      } else if (batteryVoltage < LOW_BATTERY) {
+        changeColor(255, 0, 0); //Red
+      }
+      batIndMillis = currentMillis;
+    }
+  } else {
     changeColor(0, 0, 0);
-    batIndMillis = currentMillis;
+  }
+  if (currentMillis - batCheckMillis >= batCheckInterval) {
+    isCheckBattery = false;
+    batCheckMillis = currentMillis;
   }
 }
 
