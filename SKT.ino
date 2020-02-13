@@ -25,9 +25,9 @@ TinyGPSPlus gps;
 ClickButton button1(BUTTON_PIN, LOW, CLICKBTN_PULLUP);
 BLEPeripheral blePeripheral = BLEPeripheral(BLE_REQ, BLE_RDY, BLE_RST);
 
-BLEService lSer = BLEService("1100");
-BLEUnsignedIntCharacteristic lChar = BLEUnsignedIntCharacteristic("1101", BLEWrite | BLERead |   BLENotify);
-BLEDescriptor lDesc = BLEDescriptor("2901", "Locate");
+BLEService aSer = BLEService("AA00");
+BLEUnsignedIntCharacteristic aChar = BLEUnsignedIntCharacteristic("AA01", BLEWrite | BLERead | BLENotify);
+BLEDescriptor aDesc = BLEDescriptor("2901", "Locate");
 
 BLEService fmpSer = BLEService("FF00");
 BLEUnsignedIntCharacteristic fmpChar = BLEUnsignedIntCharacteristic("FF01", BLERead | BLENotify);
@@ -47,14 +47,19 @@ const int LOW_BATTERY = 650;
 const int SOUND_BIT = 8;
 
 unsigned int buttonFunction = 0;
+unsigned int speakerInterval = 500;
+unsigned int pairingInterval = 300;
+
 unsigned long fmpMillis = 0;
 unsigned long batIndMillis = 0;
 unsigned long speakerMillis = 0;
+unsigned long pairingMillis = 0;
 
 float batteryVoltage = 0;
 bool isAlarming = false;
 unsigned int loudness = 255;
 boolean outputTone = true;
+boolean pairingState = true;
 
 
 void setup() {  
@@ -69,10 +74,10 @@ void setup() {
   pinMode(BATTERY_PIN, INPUT);
 
   blePeripheral.setLocalName("SKT-T1");
-  blePeripheral.setAdvertisedServiceUuid(lSer.uuid());
-  blePeripheral.addAttribute(lSer);
-  blePeripheral.addAttribute(lChar);
-  blePeripheral.addAttribute(lDesc);
+  blePeripheral.setAdvertisedServiceUuid(aSer.uuid());
+  blePeripheral.addAttribute(aSer);
+  blePeripheral.addAttribute(aChar);
+  blePeripheral.addAttribute(aDesc);
   
   blePeripheral.setAdvertisedServiceUuid(fmpSer.uuid());
   blePeripheral.addAttribute(fmpSer);
@@ -92,7 +97,7 @@ void setup() {
   blePeripheral.setEventHandler(BLEConnected, blePeripheralConnectHandler);
   blePeripheral.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
 
-  lChar.setValue(0);
+  aChar.setValue(0);
   button1.debounceTime   = 20; 
   button1.multiclickTime = 100;
   button1.longClickTime  = 1000;
@@ -109,14 +114,14 @@ void loop() {
   if(button1.clicks == 1) {
     if(isAlarming){
       isAlarming = false;
-      lChar.setValue(0);
+      aChar.setValue(0);
     }
     else checkBattery();
   }
   
 //  if(buttonFunction == 3) setfmpCharValue();
   
-  if(lChar.written()){
+  if(aChar.written()){
     activateSound(lChar.value());
     isAlarming = true;
   }
@@ -178,13 +183,13 @@ void playSound() {
   unsigned long currentMillis = millis();
   if(isAlarming){
     if (outputTone) {
-      if (currentMillis - soundDelay >= 500) {
+      if (currentMillis - speakerMillis >= speakerInterval) {
         speakerMillis = currentMillis;
         analogWrite(SPEAKER, 0);  
         outputTone = false;
       }
     } else {
-      if (currentMillis - soundDelay >= 500) {
+      if (currentMillis - speakerMillis >= speakerInterval) {
         speakerMillis = currentMillis;
         analogWrite(SPEAKER, loudness);
         outputTone = true;
@@ -196,11 +201,19 @@ void playSound() {
 }
 
 void pairingMode() {
-  for (int i = 0; i < 10; i++) {
-    changeColor(240, 0, 0);
-    delay(200);
-    changeColor(0, 0, 0);
-    delay(200);
+  unsigned long currentMillis = millis();
+  if (pairingState) {
+      if (currentMillis - pairingMillis >= pairingInterval) {
+        pairingMillis = currentMillis;
+        changeColor(0, 0, 0);
+        pairingState = false;
+      }
+    } else {
+    if (currentMillis - pairingMillis >= pairingInterval) {
+      pairingMillis = currentMillis;
+      changeColor(240, 0, 0);
+      pairingState = true;
+    }
   }
 }
 
