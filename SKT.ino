@@ -59,15 +59,15 @@ unsigned long pairingMillis = 0;
 unsigned long batCheckMillis = 0;
 
 float batteryVoltage = 0;
-bool isAlarming = false;
+boolean isAlarming = false;
 unsigned int loudness = 255;
-boolean outputTone = true;
+boolean speakerState = true;
 boolean pairingState = true;
-boolean isCheckBattery = true;
+boolean batteryState = true;
 
 
 void setup() {  
-  Serial.setPins(6,7);
+  Serial.setPins(RX_PIN, TX_PIN);
   Serial.begin(9600);
   
   pinMode(RL_PIN, OUTPUT);
@@ -121,7 +121,7 @@ void loop() {
       isAlarming = false;
       aChar.setValue(0);
     }
-    else isCheckBattery = true;
+    else batteryState = true;
   }
   
 //  if(buttonFunction == 3) setfmpCharValue();
@@ -186,17 +186,17 @@ void activateSound(int sound){
 
 void playSound() {
   if(isAlarming){
-    if (outputTone) {
+    if (speakerState) {
       if (currentMillis - speakerMillis >= speakerInterval) {
         speakerMillis = currentMillis;
         analogWrite(SPEAKER, 0);  
-        outputTone = false;
+        speakerState = false;
       }
     } else {
       if (currentMillis - speakerMillis >= speakerInterval) {
         speakerMillis = currentMillis;
         analogWrite(SPEAKER, loudness);
-        outputTone = true;
+        speakerState = true;
       }
     }
   }else{
@@ -221,7 +221,7 @@ void pairingMode() {
 }
 
 void checkBattery() {
-  if (isCheckBattery) {
+  if (batteryState) {
     if (currentMillis - batIndMillis >= batIndInterval) {
       if (batteryVoltage <= HIGH_BATTERY && batteryVoltage > MEDIUM_BATTERY) {
         changeColor(0, 255, 0); //Green
@@ -236,7 +236,7 @@ void checkBattery() {
     changeColor(0, 0, 0);
   }
   if (currentMillis - batCheckMillis >= batCheckInterval) {
-    isCheckBattery = false;
+    batteryState = false;
     batCheckMillis = currentMillis;
   }
 }
