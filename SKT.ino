@@ -41,11 +41,6 @@ BLEService latSer = BLEService("DD02");
 BLEFloatCharacteristic latChar = BLEFloatCharacteristic("DD03", BLERead | BLENotify);
 BLEDescriptor latDesc = BLEDescriptor("2901", "Lat");
 
-BLEService testSer = BLEService("0002");
-BLEIntCharacteristic testChar = BLEIntCharacteristic("0001", BLERead |   BLENotify);
-BLEDescriptor testDesc = BLEDescriptor("2901", "Test");
-
-
 const int HIGH_BATTERY = 840;
 const int MEDIUM_BATTERY = 760;
 const int LOW_BATTERY = 650;
@@ -54,11 +49,13 @@ const int SOUND_BIT = 8;
 unsigned int buttonFunction = 0;
 unsigned long fmpMillis = 0;
 unsigned long batIndMillis = 0;
+unsigned long speakerMillis = 0;
 
 float batteryVoltage = 0;
 bool isAlarming = false;
-int currentNoteDurations[8];
-int currentMelody[8];
+unsigned int loudness = 255;
+boolean outputTone = true;
+
 
 void setup() {  
   Serial.setPins(6,7);
@@ -91,11 +88,6 @@ void setup() {
   blePeripheral.addAttribute(latSer);
   blePeripheral.addAttribute(latChar);
   blePeripheral.addAttribute(latDesc);
-
-  blePeripheral.setAdvertisedServiceUuid(testSer.uuid());
-  blePeripheral.addAttribute(testSer);
-  blePeripheral.addAttribute(testChar);
-  blePeripheral.addAttribute(testDesc);
   
   blePeripheral.setEventHandler(BLEConnected, blePeripheralConnectHandler);
   blePeripheral.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
@@ -176,40 +168,28 @@ void setGPSCharValue() {
 
 
 void activateSound(int sound){
-  if(sound == 1){
-    int noteDurations[] = { 4, 8, 8, 4, 4, 4, 4, 4 };
-    int melody[] = {NOTE_C4, NOTE_G3, NOTE_G3, NOTE_C4, NOTE_B3, 0, NOTE_G2, NOTE_C4};
-    memcpy(currentNoteDurations, noteDurations, SOUND_BIT);
-    memcpy(currentMelody, melody, SOUND_BIT);
-  }
-  else if(sound == 2){
-    int noteDurations[] = { 4, 8, 8, 4, 4, 4, 4, 4 };
-    int melody[] = {NOTE_B3, NOTE_G2, NOTE_G1, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4};
-    memcpy(currentNoteDurations, noteDurations, SOUND_BIT);
-    memcpy(currentMelody, melody, SOUND_BIT);
-  }
-  else{
-    int noteDurations[] = { 4, 8, 8, 4, 4, 4, 4, 4 };
-    int melody[] = {NOTE_B2, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4};
-    memcpy(currentNoteDurations, noteDurations, SOUND_BIT);
-    memcpy(currentMelody, melody, SOUND_BIT);
-  }
+  if(sound == 1) loudness = 25;
+  else if(sound == 2) loudness = 45;
+  else loudness = 85;
 }
 
 
 void playSound() {
+  unsigned long currentMillis = millis();
   if(isAlarming){
-    for (int index = 0; index < SOUND_BIT; index++) {
-      analogWrite(SPEAKER_PIN, 255);
-    };
-//    for (int index = 0; index < SOUND_BIT; index++) {
-//      int noteDuration = 1000 / currentNoteDurations[index];
-//      //    if(millis() >= noteDuration)
-//      analogWrite(SPEAKER_PIN, currentMelody[index]);
-//      int pauseBetweenNotes = noteDuration * 1.30;
-//      delay(pauseBetweenNotes);
-//      analogWrite(SPEAKER_PIN, 0);
-//    }
+    if (outputTone) {
+      if (currentMillis - soundDelay >= 500) {
+        speakerMillis = currentMillis;
+        analogWrite(SPEAKER, 0);  
+        outputTone = false;
+      }
+    } else {
+      if (currentMillis - soundDelay >= 500) {
+        speakerMillis = currentMillis;
+        analogWrite(SPEAKER, loudness);
+        outputTone = true;
+      }
+    }
   }else{
     analogWrite(SPEAKER_PIN, 0);
   }
