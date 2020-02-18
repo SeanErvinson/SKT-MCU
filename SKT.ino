@@ -8,7 +8,7 @@
 #define BLE_RDY   2
 #define BLE_RST   9
 
-#define SPEAKER_PIN   28
+#define SPEAKER_PIN   23
 #define BUTTON_PIN   21
 
 #define RL_PIN 3
@@ -27,19 +27,16 @@ BLEPeripheral blePeripheral = BLEPeripheral(BLE_REQ, BLE_RDY, BLE_RST);
 
 BLEService aSer = BLEService("AA00");
 BLEUnsignedIntCharacteristic aChar = BLEUnsignedIntCharacteristic("AA01", BLEWrite | BLERead | BLENotify);
-BLEDescriptor aDesc = BLEDescriptor("2901", "Locate");
+BLEDescriptor aDesc = BLEDescriptor("2901", "Alert");
 
 BLEService fmpSer = BLEService("FF00");
 BLEUnsignedIntCharacteristic fmpChar = BLEUnsignedIntCharacteristic("FF01", BLERead | BLENotify);
 BLEDescriptor fmpDesc = BLEDescriptor("2901", "Find My Phone");
 
-BLEService longSer = BLEService("DD00");
+BLEService gpsSer = BLEService("DD00");
 BLEFloatCharacteristic longChar = BLEFloatCharacteristic("DD01", BLERead | BLENotify);
-BLEDescriptor longDesc = BLEDescriptor("2901", "Long");
-
-BLEService latSer = BLEService("DD02");
-BLEFloatCharacteristic latChar = BLEFloatCharacteristic("DD03", BLERead | BLENotify);
-BLEDescriptor latDesc = BLEDescriptor("2901", "Lat");
+BLEFloatCharacteristic latChar = BLEFloatCharacteristic("DD02", BLERead | BLENotify);
+BLEDescriptor gpsDesc = BLEDescriptor("2901", "GPS");
 
 const unsigned int HIGH_BATTERY = 840;
 const unsigned int MEDIUM_BATTERY = 760;
@@ -61,10 +58,9 @@ unsigned long batCheckMillis = 0;
 float batteryVoltage = 0;
 boolean isAlarming = false;
 unsigned int loudness = 255;
-boolean speakerState = true;
+boolean speakerState = false;
 boolean pairingState = true;
-boolean batteryState = true;
-
+boolean batteryState = false;
 
 void setup() {  
   Serial.setPins(RX_PIN, TX_PIN);
@@ -78,6 +74,7 @@ void setup() {
   pinMode(BATTERY_PIN, INPUT);
 
   blePeripheral.setLocalName("SKT-T1");
+  blePeripheral.setDeviceName("SKT-T1");
   blePeripheral.setAdvertisedServiceUuid(aSer.uuid());
   blePeripheral.addAttribute(aSer);
   blePeripheral.addAttribute(aChar);
@@ -88,15 +85,11 @@ void setup() {
   blePeripheral.addAttribute(fmpChar);
   blePeripheral.addAttribute(fmpDesc);
   
-  blePeripheral.setAdvertisedServiceUuid(longSer.uuid());
-  blePeripheral.addAttribute(longSer);
-  blePeripheral.addAttribute(longChar);
-  blePeripheral.addAttribute(longDesc);
-
-  blePeripheral.setAdvertisedServiceUuid(latSer.uuid());
-  blePeripheral.addAttribute(latSer);
+  blePeripheral.setAdvertisedServiceUuid(gpsSer.uuid());
+  blePeripheral.addAttribute(gpsSer);
   blePeripheral.addAttribute(latChar);
-  blePeripheral.addAttribute(latDesc);
+  blePeripheral.addAttribute(longChar);
+  blePeripheral.addAttribute(gpsDesc);
   
   blePeripheral.setEventHandler(BLEConnected, blePeripheralConnectHandler);
   blePeripheral.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
@@ -113,43 +106,45 @@ void loop() {
   blePeripheral.poll();
   button1.Update();
   if (button1.clicks != 0) buttonFunction = button1.clicks;
-//  BLECentral central = blePeripheral.central();
-//  if(connected()){
-
-  if(button1.clicks == 1) {
-    if(isAlarming){
-      isAlarming = false;
-      aChar.setValue(0);
+  BLECentral central = blePeripheral.central();
+  if (central) {
+    if(button1.clicks == 1) {
+      if(isAlarming){
+        isAlarming = false;
+        aChar.setValue(0);
+      }
+      else batteryState = true;
     }
-    else batteryState = true;
+    if(buttonFunction == 3) setfmpCharValue();
+    if(aChar.written()){
+      analogWrite(SPEAKER_PIN, 80);
+      activateSound(aChar.value());
+      isAlarming = true;
+    }
+    // Services
+    setGPSCharValue();
   }
   
-//  if(buttonFunction == 3) setfmpCharValue();
-  
-  if(aChar.written()){
-    activateSound(lChar.value());
-    isAlarming = true;
-  }
+ 
   
   
 // Continuous Service
-  setGPSCharValue();
 //  readBatteryVoltage();
-  checkBattery();
+//  checkBattery();
   playSound();
-//  }
 
-  if(buttonFunction == -2){
-//     if(connected()){
-//    disconnect();
-//      pairingMode();
-//     }
+  if (buttonFunction == -2) {
+    if (central.connected())) {
+      central.disconnect();
+    }
   }
-  
-//  if(buttonFunction == -4){
-//      Serial.println("Closing");  
-//      disconnect();
-//    }
+
+  if (buttonFunction == -4) {
+    if (central.connected())) {
+      central.disconnect();
+      digitalWrite(GPS_P_PIN, LOW);
+    }
+  }
   buttonFunction = 0;
 }
 
@@ -178,9 +173,9 @@ void setGPSCharValue() {
 
 
 void activateSound(int sound){
-  if(sound == 1) loudness = 25;
-  else if(sound == 2) loudness = 45;
-  else loudness = 85;
+  if(sound == 1) loudness = 85;
+  else if(sound == 2) loudness = 170;
+  else loudness = 255;
 }
 
 
@@ -189,13 +184,13 @@ void playSound() {
     if (speakerState) {
       if (currentMillis - speakerMillis >= speakerInterval) {
         speakerMillis = currentMillis;
-        analogWrite(SPEAKER, 0);  
+        analogWrite(SPEAKER_PIN, 0);  
         speakerState = false;
       }
     } else {
       if (currentMillis - speakerMillis >= speakerInterval) {
         speakerMillis = currentMillis;
-        analogWrite(SPEAKER, loudness);
+        analogWrite(SPEAKER_PIN, loudness);
         speakerState = true;
       }
     }
@@ -205,18 +200,11 @@ void playSound() {
 }
 
 void pairingMode() {
-  if (pairingState) {
-      if (currentMillis - pairingMillis >= pairingInterval) {
-        pairingMillis = currentMillis;
-        changeColor(0, 0, 0);
-        pairingState = false;
-      }
-    } else {
-    if (currentMillis - pairingMillis >= pairingInterval) {
-      pairingMillis = currentMillis;
-      changeColor(240, 0, 0);
-      pairingState = true;
-    }
+  for (int i = 0; i < 10; i++) {
+    changeColor(240, 0, 0);
+    delay(200);
+    changeColor(0, 0, 0);
+    delay(200);
   }
 }
 
@@ -224,11 +212,11 @@ void checkBattery() {
   if (batteryState) {
     if (currentMillis - batIndMillis >= batIndInterval) {
       if (batteryVoltage <= HIGH_BATTERY && batteryVoltage > MEDIUM_BATTERY) {
-        changeColor(0, 255, 0); //Green
+        changeColor(0, 255, 0);
       } else if (batteryVoltage < MEDIUM_BATTERY && batteryVoltage > LOW_BATTERY) {
-        changeColor(254, 203, 0); //Yellow
+        changeColor(254, 203, 0); 
       } else if (batteryVoltage < LOW_BATTERY) {
-        changeColor(255, 0, 0); //Red
+        changeColor(255, 0, 0);
       }
       batIndMillis = currentMillis;
     }
@@ -249,6 +237,7 @@ void changeColor(int red, int green, int blue) {
 
 void blePeripheralConnectHandler(BLECentral & central) {
   digitalWrite(GPS_P_PIN, HIGH);
+  changeColor(0,0,150);
 }
 
 void blePeripheralDisconnectHandler(BLECentral & central) {
