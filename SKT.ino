@@ -2,7 +2,6 @@
 #include <BLEPeripheral.h>
 #include <ClickButton.h>
 #include <TinyGPS++.h>
-#include "pitches.h"
 
 #define BLE_REQ   10
 #define BLE_RDY   2
@@ -15,9 +14,9 @@
 #define GL_PIN 4
 #define BL_PIN 5
 
-#define RX_PIN 6
-#define TX_PIN 7
-#define GPS_P_PIN 8
+#define GPS_P_PIN 6
+#define RX_PIN 1
+#define TX_PIN 8
 
 #define BATTERY_PIN A0
 
@@ -123,24 +122,20 @@ void loop() {
     }
     // Services
     setGPSCharValue();
-  }
-  
- 
-  
-  
+  }  
 // Continuous Service
 //  readBatteryVoltage();
 //  checkBattery();
   playSound();
 
   if (buttonFunction == -2) {
-    if (central.connected())) {
+    if (central.connected()) {
       central.disconnect();
     }
   }
 
   if (buttonFunction == -4) {
-    if (central.connected())) {
+    if (central.connected()) {
       central.disconnect();
       digitalWrite(GPS_P_PIN, LOW);
     }
