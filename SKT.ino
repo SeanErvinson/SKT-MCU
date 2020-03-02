@@ -8,17 +8,17 @@
 #define BLE_RST   9
 
 #define SPEAKER_PIN   23
-#define BUTTON_PIN   21
+#define BUTTON_PIN   26
 
-#define RL_PIN 3
-#define GL_PIN 4
-#define BL_PIN 5
+#define RL_PIN 27
+#define GL_PIN 28
+#define BL_PIN 29
 
 #define GPS_P_PIN 6
 #define RX_PIN 1
 #define TX_PIN 8
 
-#define BATTERY_PIN A0
+#define BATTERY_PIN 3
 
 TinyGPSPlus gps;
 ClickButton button1(BUTTON_PIN, LOW, CLICKBTN_PULLUP);
@@ -69,7 +69,6 @@ void setup() {
   pinMode(GL_PIN, OUTPUT);
   pinMode(BL_PIN, OUTPUT);
   pinMode(SPEAKER_PIN, OUTPUT);
-//  pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(BATTERY_PIN, INPUT);
 
   blePeripheral.setLocalName("SKT-T1");
@@ -95,7 +94,7 @@ void setup() {
 
   aChar.setValue(0);
   button1.debounceTime   = 20; 
-  button1.multiclickTime = 100;
+  button1.multiclickTime = 250;
   button1.longClickTime  = 1000;
   blePeripheral.begin();
 }
@@ -107,12 +106,9 @@ void loop() {
   if (button1.clicks != 0) buttonFunction = button1.clicks;
   BLECentral central = blePeripheral.central();
   if (central) {
-    if(button1.clicks == 1) {
-      if(isAlarming){
-        isAlarming = false;
-        aChar.setValue(0);
-      }
-      else batteryState = true;
+    if(button1.clicks == 1 && isAlarming) {
+      isAlarming = false;
+      aChar.setValue(0);
     }
     if(buttonFunction == 3) setfmpCharValue();
     if(aChar.written()){
@@ -123,21 +119,23 @@ void loop() {
     // Services
     setGPSCharValue();
   }  
+  if (button1.clicks == 1){
+    batteryState = true;
+  }
 // Continuous Service
-//  readBatteryVoltage();
-//  checkBattery();
+  readBatteryVoltage();
+  checkBattery();
   playSound();
 
-  if (buttonFunction == -2) {
+  if (buttonFunction == -2) { // 1 Click then hold
     if (central.connected()) {
       central.disconnect();
     }
   }
 
-  if (buttonFunction == -4) {
+  if (buttonFunction == -3) { // 2 Clicks then hold
     if (central.connected()) {
       central.disconnect();
-      digitalWrite(GPS_P_PIN, LOW);
     }
   }
   buttonFunction = 0;
@@ -149,10 +147,8 @@ void readBatteryVoltage(){
 
 void setfmpCharValue(){
   fmpChar.setValue(1);
-  changeColor(115, 255, 0);
   if(currentMillis - fmpMillis >= 50){fmpMillis = currentMillis;}
   fmpChar.setValue(0); 
-  changeColor(0, 0, 0);
 }
 
 void setGPSCharValue() {
