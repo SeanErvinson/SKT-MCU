@@ -1,27 +1,25 @@
 #include <SPI.h>
 #include <BLEPeripheral.h>
-#include <ClickButton.h>
 #include <TinyGPS++.h>
 
 #define BLE_REQ   10
 #define BLE_RDY   2
 #define BLE_RST   9
 
-#define SPEAKER_PIN   23
-#define BUTTON_PIN   26
+#define SPEAKER_PIN   3
+#define BUTTON_PIN   21
 
-#define RL_PIN 27
-#define GL_PIN 28
-#define BL_PIN 29
+#define RL_PIN 22
+#define GL_PIN 23
+#define BL_PIN 24
 
 #define GPS_P_PIN 6
 #define RX_PIN 1
 #define TX_PIN 8
 
-#define BATTERY_PIN 3
+#define BATTERY_PIN 4
 
 TinyGPSPlus gps;
-ClickButton button1(BUTTON_PIN, LOW, CLICKBTN_PULLUP);
 BLEPeripheral blePeripheral = BLEPeripheral(BLE_REQ, BLE_RDY, BLE_RST);
 
 BLEService aSer = BLEService("AA00");
@@ -44,8 +42,6 @@ const unsigned int speakerInterval = 500;
 const unsigned int pairingInterval = 300;
 const unsigned int batIndInterval = 300;
 const unsigned int batCheckInterval = 3000;
-
-unsigned int buttonFunction = 0;
 
 unsigned long currentMillis;
 unsigned long fmpMillis = 0;
@@ -70,6 +66,7 @@ void setup() {
   pinMode(BL_PIN, OUTPUT);
   pinMode(SPEAKER_PIN, OUTPUT);
   pinMode(BATTERY_PIN, INPUT);
+  pinMode(BUTTON_PIN, INPUT);
 
   blePeripheral.setLocalName("SKT-T1");
   blePeripheral.setDeviceName("SKT-T1");
@@ -93,52 +90,39 @@ void setup() {
   blePeripheral.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
 
   aChar.setValue(0);
-  button1.debounceTime   = 20; 
-  button1.multiclickTime = 250;
-  button1.longClickTime  = 1000;
   blePeripheral.begin();
 }
 
 void loop() {
   currentMillis = millis();
   blePeripheral.poll();
-  button1.Update();
-  if (button1.clicks != 0) buttonFunction = button1.clicks;
   BLECentral central = blePeripheral.central();
   if (central) {
-    if(button1.clicks == 1 && isAlarming) {
+    if(digitalRead(BUTTON_PIN) == HIGH && isAlarming) {
       isAlarming = false;
       aChar.setValue(0);
     }
-    if(buttonFunction == 3) setfmpCharValue();
+//    if(buttonFunction == 3) setfmpCharValue();
     if(aChar.written()){
-      analogWrite(SPEAKER_PIN, 80);
+      changeColor(100, 100, 50);
       activateSound(aChar.value());
       isAlarming = true;
     }
     // Services
     setGPSCharValue();
   }  
-  if (button1.clicks == 1){
+  if (digitalRead(BUTTON_PIN) == HIGH){
     batteryState = true;
   }
 // Continuous Service
   readBatteryVoltage();
   checkBattery();
   playSound();
-
-  if (buttonFunction == -2) { // 1 Click then hold
-    if (central.connected()) {
-      central.disconnect();
-    }
-  }
-
-  if (buttonFunction == -3) { // 2 Clicks then hold
-    if (central.connected()) {
-      central.disconnect();
-    }
-  }
-  buttonFunction = 0;
+//  if (buttonFunction == -2) { // 1 Click then hold
+//    if (central.connected()) {
+//      central.disconnect();
+//    }
+//  }
 }
 
 void readBatteryVoltage(){
@@ -201,22 +185,16 @@ void pairingMode() {
 
 void checkBattery() {
   if (batteryState) {
-    if (currentMillis - batIndMillis >= batIndInterval) {
-      if (batteryVoltage <= HIGH_BATTERY && batteryVoltage > MEDIUM_BATTERY) {
-        changeColor(0, 255, 0);
-      } else if (batteryVoltage < MEDIUM_BATTERY && batteryVoltage > LOW_BATTERY) {
-        changeColor(254, 203, 0); 
-      } else if (batteryVoltage < LOW_BATTERY) {
-        changeColor(255, 0, 0);
-      }
-      batIndMillis = currentMillis;
+    if (batteryVoltage <= HIGH_BATTERY && batteryVoltage > MEDIUM_BATTERY) {
+      changeColor(0, 255, 0);
+    } else if (batteryVoltage < MEDIUM_BATTERY && batteryVoltage > LOW_BATTERY) {
+      changeColor(254, 203, 0); 
+    } else {
+      changeColor(255, 0, 0);
     }
-  } else {
+    delay(250);
     changeColor(0, 0, 0);
-  }
-  if (currentMillis - batCheckMillis >= batCheckInterval) {
     batteryState = false;
-    batCheckMillis = currentMillis;
   }
 }
 
