@@ -1,3 +1,4 @@
+#include <SwitchPack.h>
 #include <SPI.h>
 #include <BLEPeripheral.h>
 #include <TinyGPS++.h>
@@ -19,7 +20,11 @@
 
 #define BATTERY_PIN 4
 
+#define REACTION_TIME 500
+
 TinyGPSPlus gps;
+DoubleClick button(BUTTON_PIN, PULLDOWN, REACTION_TIME);
+TimedClick timedButton(BUTTON_PIN, PULLDOWN);
 BLEPeripheral blePeripheral = BLEPeripheral(BLE_REQ, BLE_RDY, BLE_RST);
 
 BLEService aSer = BLEService("AA00");
@@ -56,6 +61,7 @@ unsigned int loudness = 255;
 boolean speakerState = false;
 boolean pairingState = true;
 boolean batteryState = false;
+byte buttonState;
 
 void setup() {  
   Serial.setPins(RX_PIN, TX_PIN);
@@ -65,7 +71,6 @@ void setup() {
   pinMode(GL_PIN, OUTPUT);
   pinMode(BL_PIN, OUTPUT);
   pinMode(SPEAKER_PIN, OUTPUT);
-  pinMode(BATTERY_PIN, INPUT);
   pinMode(BUTTON_PIN, INPUT);
 
   blePeripheral.setLocalName("SKT-T1");
@@ -91,38 +96,42 @@ void setup() {
 
   aChar.setValue(0);
   blePeripheral.begin();
+  button.begin();
+  button.setMaxClicks(3);
+  timedButton.begin();
 }
 
 void loop() {
+  buttonState = button.clickCount();
   currentMillis = millis();
   blePeripheral.poll();
   BLECentral central = blePeripheral.central();
   if (central) {
-    if(digitalRead(BUTTON_PIN) == HIGH && isAlarming) {
+    if(buttonState && isAlarming) {
       isAlarming = false;
       aChar.setValue(0);
     }
-//    if(buttonFunction == 3) setfmpCharValue();
+    if(buttonState == 3) setfmpCharValue();
     if(aChar.written()){
-      changeColor(100, 100, 50);
       activateSound(aChar.value());
       isAlarming = true;
     }
     // Services
     setGPSCharValue();
   }  
-  if (digitalRead(BUTTON_PIN) == HIGH){
+  if (buttonState){
     batteryState = true;
   }
 // Continuous Service
   readBatteryVoltage();
   checkBattery();
   playSound();
-//  if (buttonFunction == -2) { // 1 Click then hold
-//    if (central.connected()) {
-//      central.disconnect();
-//    }
-//  }
+  if (timedButton.clicked()) {
+  if (timedButton.clickTime() >= 4000) {
+    if (central.connected()) {
+      central.disconnect();
+    }
+  }}
 }
 
 void readBatteryVoltage(){
